@@ -20,11 +20,11 @@ timezone: Asia/Shanghai
 
 title: Jugg's Blog                          # the main title
 
-tagline: A programmer who can do nothing   # it will display as the sub-title
+tagline: A programmer who knows nothing!   # it will display as the sub-title
 
 description: >-                        # used by seo meta and the atom feed
   wangkekai, kekaiwang, Jugg, 王铁匠, 
-  A programmer who can do nothing.
+  A programmer who knows nothing.
 
 # fill in the protocol & hostname for your site, e.g., 'https://username.github.io'
 url: ''
