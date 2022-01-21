@@ -4,7 +4,7 @@ author:
   name: Jugg Wang
   link: https://github.com/kekaiwang
 date: 2022-01-20 09:50:00 +0800
-last_modified_at: 2022-01-20 15:50:00 +0800
+last_modified_at: 2022-01-21 22:50:00 +0800
 categories: [Interview, Redis]
 tags: [面试, redis]
 ---
@@ -170,7 +170,7 @@ AOF 日志在长期的运行过程中会变的无比庞大，数据库重启时�
 
 #### RDB 快照原理
 
-Redis 使用操作系统的多进程 COW(Copy On Write) 机制来实现快照持久化。
+**Redis 使用操作系统的多进程 COW(Copy On Write) 机制来实现快照持久化**。
 
 *Redis 在持久化时会调用 glibc 的函数 fork 产生一个子进程，快照持久化完全交给子进程来处理，父进程继续处理客户端请求*。子进程刚刚产生时，它和父进程共享内存里面的代码段和数据段。这是 Linux 操作系统的机制，为了节约内存资源，所以尽可能让它们共享起来。在进程分离的一瞬间，内存的增长几乎没有明显变化。
 
@@ -188,6 +188,12 @@ Redis 使用操作系统的多进程 COW(Copy On Write) 机制来实现快照持
 
 Redis 会在收到客户端修改指令后，进行参数校验进行逻辑处理后，如果没问题，就立即将该指令文本存储到 AOF 日志中，也就是*先执行指令才将日志存盘*。这点不同于 leveldb、hbase 等存储引擎，它们都是先存储日志再做逻辑处理。
 
+Redis 提供的 AOF 配置项 `appendfsync` 写回策略直接决定 AOF 持久化功能的效率和安全性。
+
+- **always**：同步写回，写指令执行完毕立马将aof_buf缓冲区中的内容刷写到 AOF 文件。
+- **everysec**：每秒写回，写指令执行完，日志只会写到 AOF 文件缓冲区，每隔一秒就把缓冲区内容同步到磁盘。
+- **no**：操作系统控制，写执行执行完毕，把日志写到 AOF 文件内存缓冲区，由操作系统决定何时刷写到磁盘。
+
 Redis 在长期运行的过程中，AOF 的日志会越变越长。如果实例宕机重启，重放整个 AOF 日志会非常耗时，导致长时间 Redis 无法对外提供服务。所以需要对 AOF 日志瘦身。
 
 ##### AOF 重写
@@ -204,3 +210,253 @@ Redis 提供了 `bgrewriteaof` 指令用于对 AOF 日志进行瘦身。**其原
 ![image](https://mail.wangkekai.cn/3354A8D7-3098-4448-81D8-ED5BBF6B0CC6.png)
 
 于是在 Redis 重启的时候，**可以先加载 rdb 的内容，然后再重放增量 AOF 日志就可以完全替代之前的 AOF 全量文件重放，重启效率因此大幅得到提升**。
+
+### Redis 基础数据类型和结构
+
+所有的 Redis 对象都有下面这个对象头结构：
+
+```c
+struct RedisObject {
+    int4 type; // 4bits
+    int4 encoding; // 4bits
+    int24 lru; // 24bits
+    int32 refcount; // 4bytes
+    void *ptr; // 8bytes，64-bit system
+} robj;
+```
+
+不同的对象具有不同的类型 `type(4bit)`，同一个类型的 type 会有不同的存储形式 `encoding(4bit)`，为了记录对象的 LRU 信息，使用了 24 个 bit 来记录 LRU 信息。每个对象都有个引用计数，当引用计数为零时，对象就会被销毁，内存被回收。`ptr` 指针将指向对象内容 (body) 的具体存储位置。这样一个 `RedisObject` 对象头需要占据 16 字节的存储空间。
+
+#### String 字符串类型
+
+##### 基础介绍
+
+字符串结构使用非常广泛，一个常见的用途就是缓存用户信息、锁、计数器和限速器等。
+
+如果 value 值是一个整数，还可以对它进行自增操作。
+**自增是有范围的，它的范围是 signed long 的最大最小值，超过了这个值，Redis 会报错**。
+
+**Redis 规定字符串的长度不得超过 512M 字节**。
+
+##### 常用命令
+
+```shell
+> set name Jugg 
+OK
+> exists name # 是否存在
+(integer) 1
+> del name # 删除
+(integer) 1
+> get name
+(nil)
+
+# 批量操作
+> mset name1 boy name2 girl name3 unknown
+> mget name1 name2 name3 # 返回一个列表
+1) "Jugg"
+2) "holycoder"
+3) (nil)
+
+// 过期
+> expire name 5  # 5s 后过期
+> get name # wait for 5s
+(nil)
+> ttl name
+-1
+
+> set age 30
+OK
+> incr age
+(integer) 31
+> incrby age 5
+(integer) 36
+> incrby age -5
+(integer) 31
+> set codehole 9223372036854775807  # Long.Max
+OK
+> incr codehole
+(error) ERR increment or decrement would overflow
+
+> setex name 5 Jugg  # 5s 后过期，等价于 set+expire
+
+> setnx name Jugg  # 如果 name 不存在就执行 set 创建，如果已经存在，set 创建不成功
+(integer) 1 / 0
+> get name
+"Jugg"
+
+// set 指令扩展
+> set lock:Jugg true ex 5 nx
+OK
+```
+
+##### 底层结构
+
+```c
+struct SDS<T> {
+  T capacity; // 数组容量
+  T len; // 数组长度
+  byte flags; // 特殊标识位，不理睬它
+  byte[] content; // 数组内容
+}
+```
+
+Redis 的字符串是动态字符串，是可以修改的字符串，采用预分配冗余空间的方式来减少内存的频繁分配，*内部为当前字符串实际分配的空间 `capacity` 一般要高于实际字符串长度 `len`*。但是 Redis 创建字符串时 `len` 和 `capacity` 一样长，不会多分配冗余空间，这是因为绝大多数场景下我们不会使用 `append` 操作来修改字符串。
+
+上面的 `SDS` 结构使用了范型 T，为什么不直接用 int 呢，这是因为当字符串比较短时，len 和 capacity 可以使用 `byte` 和 `short` 来表示，Redis 为了对内存做极致的优化，**不同长度的字符串使用不同的结构体来表示**。
+
+##### embstr vs raw
+
+Redis 的字符串有两种存储方式，**在长度特别短时**，使用 `emb` 形式存储 (embeded)，**当长度超过 44 时**，使用 `raw` 形式存储。
+
+在字符串比较小时，SDS 对象头的大小是 capacity+3，至少是 3。意味着分配一个字符串的最小空间占用为 19 字节 (16+3)。RedisObject 占用 16 字节，SDS 占用 3 字节。
+
+- **`embstr` 存储形式**: 它将 RedisObject 对象头和 SDS 对象连续存在一起，使用 `malloc` 方法一次分配。
+- **`raw` 存储形式**: 它需要两次 `malloc`，两个对象头在内存地址上一般是不连续的。
+
+字符串是由多个字节组成，每个字节又是由 8 个 bit 组成，如此便可以将一个字符串看成很多 bit 的组合，这便是 bitmap「位图」数据结构。
+
+##### String 扩容
+
+**当字符串长度小于 1M 时，扩容都是加倍现有的空间**，也就是保留 100% 的冗余空间。如果超过 1M，扩容时一次只会多扩 1M 的空间。**字符串最大长度为 512M。**
+
+#### List 列表
+
+##### List 基础介绍
+
+**Redis 的列表结构常用来做异步队列使用**。比如秒杀场景将需要延后处理的任务结构体序列化成字符串塞进 Redis 的列表，另一个线程从这个列表中轮询数据进行处理。
+
+Redis 的列表相当于 Java 语言里面的 LinkedList，***注意它是链表而不是数组***。  
+**这意味着 list 的插入和删除操作非常快，时间复杂度为 O(1)，但是索引定位很慢，时间复杂度为 O(n)，这点让人非常意外**。
+
+##### List 常用命令
+
+```shell
+# 对列 右进左出
+> rpush books python java golang
+(integer) 3
+> llen books
+(integer) 3
+> lpop books
+"python"
+...
+> lpop books
+(nil)
+
+# 栈 - 右进右出
+> rpush books python java golang
+(integer) 3
+> rpop books
+"golang"
+...
+> rpop books
+(nil)
+
+> lindex books 1  # O(n) 慎用
+"java"
+> lrange books 0 -1  # 获取所有元素，O(n) 慎用
+1) "python"
+2) "java"
+3) "golang"
+> ltrim books 1 -1 # O(n) 慎用
+OK
+> lrange books 0 -1
+1) "java"
+2) "golang"
+> ltrim books 1 0 # 这其实是清空了整个列表，因为区间范围长度为负
+OK
+> llen books
+(integer) 0
+```
+
+##### 慢操作
+
+`lindex` 方法，它需要对链表进行遍历，性能随着参数 `index` 增大而变差。
+
+`ltrim` 和字面上的含义不太一样，个人觉得它叫 `lretain`(保留) 更合适一些，因为 ltrim 跟的两个参数 `start_index` 和 `end_index` 定义了一个区间，在这个区间内的值，ltrim 要保留，区间之外统统砍掉。我们可以通过 ltrim 来实现一个定长的链表，这一点非常有用。
+
+index 可以为负数，`index=-1` 表示倒数第一个元素，同样 `index=-2` 表示倒数第二个元素。
+
+##### list 底层结构
+
+Redis 底层存储的还不是一个简单的 linkedlist，而是称之为 **快速链表** `quicklist` 的一个结构。
+
+**首先在列表元素较少的情况下会使用一块连续的内存存储**，这个结构是 `ziplist`，也就是**压缩列表**。*它将所有的元素紧挨着一起存储，分配的是一块连续的内存*。  
+**当数据量比较多的时候才会改成 `quicklist`**。
+
+考虑到链表的附加空间相对太高，prev 和 next 指针就要占去 16 个字节 (64bit 系统的指针是 8 个字节)，另外每个节点的内存都是单独分配，会加剧内存的碎片化，影响内存管理效率。  
+后续版本对列表数据结构进行了改造，**使用 quicklist 代替了 ziplist 和 linkedlist**。
+
+###### 快速列表
+
+```c++
+// 链表的节点
+struct listNode<T> {
+    listNode* prev;
+    listNode* next;
+    T value;
+}
+// 链表
+struct list {
+    listNode *head;
+    listNode *tail;
+    long length;
+}
+```
+
+*quicklist 是 ziplist 和 linkedlist 的混合体，它将 linkedlist 按段切分，每一段使用 ziplist 来紧凑存储，多个 ziplist 之间使用双向指针串接起来*。
+
+###### 压缩列表
+
+Redis 为了节约内存空间使用，**`zset` 和 `hash` 容器对象在元素个数较少的时候，采用压缩列表 (ziplist) 进行存储**。  
+**压缩列表是一块连续的内存空间，元素之间紧挨着存储，没有任何冗余空隙**。
+
+```c++
+struct ziplist<T> {
+    int32 zlbytes; // 整个压缩列表占用字节数
+    int32 zltail_offset; // 最后一个元素距离压缩列表起始位置的偏移量，用于快速定位到最后一个节点
+    int16 zllength; // 元素个数
+    T[] entries; // 元素内容列表，挨个挨个紧凑存储
+    int8 zlend; // 标志压缩列表的结束，值恒为 0xFF
+}
+
+struct entry {
+    int<var> prevlen; // 前一个 entry 的字节长度
+    int<var> encoding; // 元素类型编码
+    optional byte[] content; // 元素内容
+}
+```
+
+压缩列表为了支持双向遍历，所以才会有 `ztail_offset` 这个字段，用来快速定位到最后一个元素，然后倒着遍历。`entry` 的 `prevlen` 字段表示前一个 `entry` 的字节长度，当压缩列表倒着遍历时，需要通过这个字段来快速定位到下一个元素的位置。
+
+###### 增加元素
+
+因为 ziplist 都是紧凑存储，没有冗余空间 (对比一下 Redis 的字符串结构)。意味着插入一个新的元素就需要调用 realloc 扩展内存。取决于内存分配器算法和当前的 ziplist 内存大小，realloc 可能会重新分配新的内存空间，并将之前的内容一次性拷贝到新的地址，也可能在原有的地址上进行扩展，这时就不需要进行旧内容的内存拷贝。
+
+如果 ziplist 占据内存太大，重新分配内存和拷贝内存就会有很大的消耗。所以 **ziplist 不适合存储大型字符串，存储的元素也不宜过多**。
+
+###### 级联更新
+
+每个 entry 都会有一个 `prevlen` 字段存储前一个 entry 的长度。如果内容小于 254 字节，prevlen 用 1 字节存储，否则就是 5 字节。
+
+如果 ziplist 里面每个 entry 恰好都存储了 253 字节的内容，那么第一个 entry 内容的修改就会导致后续所有 entry 的级联更新，这就是一个比较耗费计算资源的操作。
+
+###### 压缩深度
+
+![image](https://mail.wangkekai.cn/71ABE178-6788-4362-90F7-EB1F74495E9E.png)
+quicklist 默认的压缩深度是 0，也就是不压缩。压缩的实际深度由配置参数 `list-compress-depth` 决定。为了支持快速的 push/pop 操作，quicklist 的首尾两个 ziplist 不压缩，此时深度就是 1。如果深度为 2，就表示 quicklist 的首尾第一个 ziplist 以及首尾第二个 ziplist 都不压缩。
+
+###### 每个 ziplist 存多少元素？
+
+`quicklist` 内部默认单个 ziplist 长度为 8k 字节，超出了这个字节数，就会新起一个 ziplist。ziplist 的长度由配置参数 `list-max-ziplist-size` 决定。
+
+#### hash 字典
+
+##### hash 基础介绍
+
+hash 可以记录结构体信息，如帖子的标题、摘要、作者和封面信息、点赞数、评论数和点击数；缓存近期热帖内容
+
+Redis 的字典相当于 Java 语言里面的 HashMap，它是**无序字典**。内部实现结构是**数组 + 链表二维结构。第一维 hash 的数组位置碰撞时，就会将碰撞的元素使用链表串接起来**。
+![image](https://mail.wangkekai.cn/999C4B1B-8CD5-42E5-BF26-74022C9B2326.png)
+
+**Redis 为了高性能，不能堵塞服务，所以采用了渐进式 rehash 策略**。
+![image](https://mail.wangkekai.cn/C5E5EF39-9A78-4D29-A1F7-C3983C4F4A58.png)
