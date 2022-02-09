@@ -4,6 +4,7 @@ author:
   name: Jugg Wang
   link: https://github.com/kekaiwang
 date: 2022-01-19 20:30:00 +0800
+last_modified_at: 2022-02-08 10:50:00 +0800
 categories: [MySQL, InnoDB]
 tags: [InnoDB, MyISAM]
 render_with_liquid: false
@@ -24,7 +25,7 @@ InnoDB 支持事物，MyISAM 不支持
 
 ### 索引
 
-- InnoDB 使用 B+ 树聚簇索引，MyISAM 非聚簇索引
+InnoDB 使用 B+ 树聚簇索引，MyISAM 非聚簇索引
 
 ### 全文索引
 

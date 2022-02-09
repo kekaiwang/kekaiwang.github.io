@@ -5,7 +5,7 @@ author:
   link: https://github.com/SilleBille
 date: 2022-01-20 09:50:00 +0800
 update: 2022-01-20 09:50:00 +0800
-categories: [Interview, MySQL]
+categories: [MySQL, Interview]
 tags: [面试, mysql]
 ---
 

@@ -4,8 +4,9 @@ author:
   name: Jugg Wang
   link: https://github.com/kekaiwang
 date: 2022-01-18 14:30:00 +0800
-categories: [MySQL, index]
-tags: [index]
+last_modified_at: 2022-02-08 10:50:00 +0800
+categories: [MySQL, 索引]
+tags: [index, 索引]
 img_path: /assets/_img/mysql/index
 ---
 
