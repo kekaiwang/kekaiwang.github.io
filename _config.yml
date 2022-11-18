@@ -18,12 +18,12 @@ timezone: Asia/Shanghai
 # jekyll-seo-tag settings › https://github.com/jekyll/jekyll-seo-tag/blob/master/docs/usage.md
 # ↓ --------------------------
 
-title: Jugg's Blog                          # the main title
+title: Kane's Blog                          # the main title
 
 tagline: A programmer who knows nothing!   # it will display as the sub-title
 
 description: >-                        # used by seo meta and the atom feed
-  wangkekai, kekaiwang, Jugg, 王铁匠, 
+  wangkekai, kekaiwang, Kane, 王铁匠, 
   A programmer who knows nothing.
 
 # fill in the protocol & hostname for your site, e.g., 'https://username.github.io'
@@ -38,7 +38,7 @@ twitter:
 social:
   # Change to your full name.
   # It will be displayed as the default author of the posts and the copyright owner in the Footer
-  name: Jugg Wang 
+  name: Kane Wang 
   email: wkekai@163.com             # change to your email address
   links:
     # The first element serves as the copyright owner's link
