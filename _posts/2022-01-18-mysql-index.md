@@ -319,6 +319,5 @@ MySQL 5.6 引入的索引下推优化（index condition pushdown)， 可以在�
 
 ### reference
   
-    [MySQL索引总结] (https://zhuanlan.zhihu.com/p/29118331)  
-    [一文搞懂MySQL索引] (https://blog.csdn.net/wangfeijiu/article/details/113409719)
-
+  [MySQL索引总结] (https://zhuanlan.zhihu.com/p/29118331)  
+  [一文搞懂MySQL索引] (https://blog.csdn.net/wangfeijiu/article/details/113409719)
