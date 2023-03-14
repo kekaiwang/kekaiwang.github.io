@@ -1,7 +1,7 @@
 ---
 title: MySQL 索引及常见面试题
 author:
-  name: Jugg Wang
+  name: Kane Wang
   link: https://github.com/kekaiwang
 date: 2022-01-18 14:30:00 +0800
 last_modified_at: 2022-02-08 10:50:00 +0800

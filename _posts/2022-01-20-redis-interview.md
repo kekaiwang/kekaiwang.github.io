@@ -1,7 +1,7 @@
 ---
 title: Redis 常见面试题
 author:
-  name: Jugg Wang
+  name: Kane Wang
   link: https://github.com/kekaiwang
 date: 2022-01-20 09:50:00 +0800
 last_modified_at: 2022-02-07 22:50:00 +0800

@@ -1,7 +1,7 @@
 ---
 title: Go 常见面试题
 author:
-  name: Jugg Wang
+  name: Kane Wang
   link: https://github.com/kekaiwang
 date: 2022-02-08 09:30:00 +0800
 categories: [Go, Interview]

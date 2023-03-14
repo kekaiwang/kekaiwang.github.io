@@ -1,7 +1,7 @@
 ---
 title: MySQL - InnoDB 和 MyISAM 的区别
 author:
-  name: Jugg Wang
+  name: Kane Wang
   link: https://github.com/kekaiwang
 date: 2022-01-19 20:30:00 +0800
 last_modified_at: 2022-02-08 10:50:00 +0800
