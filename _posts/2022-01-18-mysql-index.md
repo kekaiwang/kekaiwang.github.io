@@ -8,6 +8,7 @@ last_modified_at: 2022-02-08 10:50:00 +0800
 categories: [MySQL, 索引]
 tags: [index, 索引]
 img_path: /assets/_img/mysql/index
+comments: true
 ---
 
 ### 一、索引是什么？

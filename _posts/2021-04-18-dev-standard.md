@@ -5,7 +5,7 @@ author:
   link: https://kekai.wang/
 date: 2021-04-18 15:00:00 +0800
 categories: [Go, comments]
-tags: [develop]
+tags: [develop, Go]
 pin: false
 ---
 
