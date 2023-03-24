@@ -6,7 +6,7 @@ author:
 date: 2022-01-20 09:50:00 +0800
 last_modified_at: 2022-02-07 22:50:00 +0800
 categories: [Redis, Interview]
-tags: [面试, redis]
+tags: [面试, Redis]
 ---
 
 #### Redis 为什么这么快？
